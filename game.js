@@ -58,7 +58,7 @@ class Snake {
     }
 
     update(targetAngle, isAccelerating) {
-        if (!gameStarted || this.readyToRemove) return;
+        if (this.readyToRemove) return;
 
         if (this.isDead) { // Dying animation state
             this.deathAlpha -= 0.1;
@@ -243,7 +243,11 @@ class Snake {
                 ctx.save();
                 ctx.shadowBlur = 0;
                 ctx.shadowColor = 'transparent';
+                // Sine wave color ramp effect along the body segments (modulating brightness, not opacity)
+                ctx.globalAlpha = this.deathAlpha;
+                ctx.filter = `brightness(${0.9 + 0.1 * Math.sin((i / 6) * Math.PI * 2)})`;
                 ctx.drawImage(this.segmentCanvasCache, screenX - centerOffset, screenY - centerOffset);
+                ctx.filter = 'none'; // reset filter
                 ctx.restore();
             } else {
                 ctx.beginPath();
@@ -266,7 +270,12 @@ class Snake {
                 ctx.fillStyle = fallbackFill;
                 ctx.shadowBlur = 10;
                 ctx.shadowColor = fallbackShadow;
+                // Sine wave color ramp effect along the body segments
+                ctx.save();
+                ctx.globalAlpha = this.deathAlpha;
+                ctx.filter = `brightness(${0.9 + 0.1 * Math.sin((i / 6) * Math.PI * 2)})`;
                 ctx.fill();
+                ctx.restore();
             }
 
             // Draw eyes on the head
@@ -344,14 +353,15 @@ class Pellet {
         this.baseY = (Math.random() - 0.5) * WORLD_SIZE;
         this.x = this.baseX;
         this.y = this.baseY;
-        this.orbitRadius = 1 + Math.random() * 5; // Smaller loop radius
-        this.orbitSpeed = (Math.random() < 0.5 ? 1 : -1) * (0.05 + Math.random() * 0.04);
+        this.orbitRadius = 2 + Math.random() * 7; // Wider loop radius
+        this.orbitSpeed = (Math.random() < 0.5 ? 1 : -1) * (0.05 + Math.random() * 0.07); // Faster orbit
         this.orbitAngle = Math.random() * Math.PI * 2;
         this.size = 4 + Math.random() * 3;
         this.pulse = Math.random() * Math.PI * 2;
+        this.pulseSpeed = 0.08 + Math.random() * 0.03;
         // Generate a random vibrant color
-        const hue = Math.floor(Math.random() * 360);
-        this.color = `hsl(${hue}, 100%, 60%)`;
+        this.hue = Math.floor(Math.random() * 360);
+        this.color = `hsl(${this.hue}, 100%, 60%)`;
         this.isEaten = false;
         this.targetSnake = null;
         this.spawnAlpha = 1.0;
@@ -397,7 +407,7 @@ class Pellet {
             this.orbitAngle += this.orbitSpeed;
             this.x = this.baseX + Math.cos(this.orbitAngle) * this.orbitRadius;
             this.y = this.baseY + Math.sin(this.orbitAngle) * this.orbitRadius;
-            this.pulse += 0.05;
+            this.pulse += this.pulseSpeed;
         }
     }
 
@@ -414,17 +424,24 @@ class Pellet {
         // Subtler blink effect (multiplier 0.5 instead of 2), and don't blink if eaten
         const pSize = this.isEaten ? Math.max(0.1, this.size) : this.size + Math.sin(this.pulse) * 0.5;
 
+        // Reset to solid spawn alpha
+        ctx.globalAlpha = this.spawnAlpha;
+
+        // Smoothly ramp lightness up and down as a glow blink instead of opacity
+        const lightness = this.isEaten ? 60 : 60 + 20 * Math.sin(this.pulse * 2);
+        const currentColor = `hsl(${this.hue}, 100%, ${lightness}%)`;
+
         ctx.beginPath();
         ctx.arc(screenX, screenY, pSize, 0, Math.PI * 2);
-        ctx.fillStyle = this.color;
+        ctx.fillStyle = currentColor;
 
         if (this.isEaten) {
             ctx.shadowBlur = 5;
-            ctx.shadowColor = this.color;
+            ctx.shadowColor = currentColor;
             ctx.fill();
         } else {
-            ctx.shadowBlur = 20; // Tight enough to be visible
-            ctx.shadowColor = this.color;
+            ctx.shadowBlur = 25; // Enhance glow
+            ctx.shadowColor = currentColor;
             ctx.fill();
             ctx.fill(); // Double drawing heavily intensifies the glow opacity
         }
@@ -494,6 +511,7 @@ let npcNames = [
 let playerRespawnTime = 0;
 let lastCamX = 0;
 let lastCamY = 0;
+let isIntroPan = true;
 
 // FPS tracking
 let lastFrameTime = performance.now();
@@ -504,7 +522,7 @@ const fpsElement = document.getElementById('fps-counter');
 function init() {
     resize();
     snakes = [];
-    snakes.push(new Snake(0, 0, playerName || "Player", "blue", true));
+    // Player will spawn when startGame is called
 
     // Spawn some NPCs
     for (let i = 0; i < 5; i++) {
@@ -522,8 +540,8 @@ function init() {
     pellets = Array.from({ length: PELLET_COUNT }, () => new Pellet());
 
     // Auto-focus the input field
-    const usernameInput = document.getElementById('username-input');
-    if (usernameInput) usernameInput.focus();
+    const nameInput = document.getElementById('name-input');
+    if (nameInput) nameInput.focus();
 
     requestAnimationFrame((timestamp) => {
         lastFrameTime = timestamp || performance.now();
@@ -560,19 +578,13 @@ function startGame(e) {
     e.preventDefault();
     if (gameStarted) return;
 
-    const input = document.getElementById('username-input');
+    const input = document.getElementById('name-input');
     playerName = input.value.trim() || 'Player';
 
-    // Update the player's name if they've already spawned in the background
-    const p = snakes.find(s => s.isPlayer);
-    if (p) {
-        p.name = playerName;
-    } else {
-        // Respawn the player if they were entirely removed due to death
-        const spawnX = (Math.random() - 0.5) * WORLD_SIZE;
-        const spawnY = (Math.random() - 0.5) * WORLD_SIZE;
-        snakes.push(new Snake(spawnX, spawnY, playerName, "blue", true));
-    }
+    // Spawn the player
+    const spawnX = (Math.random() - 0.5) * WORLD_SIZE;
+    const spawnY = (Math.random() - 0.5) * WORLD_SIZE;
+    snakes.push(new Snake(spawnX, spawnY, playerName, "blue", true));
 
     gameStarted = true;
 
@@ -860,9 +872,16 @@ function animate(currentTime) {
                 // 1. Find closest uneaten pellet
                 let closestDist = Infinity;
                 let closestPellet = null;
+                const searchRadius = 1500; // Much wider radius to find food
                 for (const p of pellets) {
                     if (p.isEaten) continue;
-                    const distSq = Math.pow(p.x - snake.head.x, 2) + Math.pow(p.y - snake.head.y, 2);
+
+                    // Fast box check for performance across 2500 pellets
+                    const dx = p.x - snake.head.x;
+                    const dy = p.y - snake.head.y;
+                    if (Math.abs(dx) > searchRadius || Math.abs(dy) > searchRadius) continue;
+
+                    const distSq = dx * dx + dy * dy;
                     if (distSq < closestDist) {
                         closestDist = distSq;
                         closestPellet = p;
@@ -913,14 +932,19 @@ function animate(currentTime) {
 
                 // 3. Add smooth wander
                 if (snake.wanderAngle === undefined) snake.wanderAngle = 0;
-                snake.wanderAngle += (Math.random() - 0.5) * 0.8; // Huge increase in wander volatility
+
+                // If actively tracking food within the wide radius, decrease wander so they don't miss it
+                let wanderDampen = 1.0;
+                if (closestPellet) wanderDampen = 0.2;
+
+                snake.wanderAngle += (Math.random() - 0.5) * 0.8 * wanderDampen; // Wander volatility
                 // Bound wander angle 
-                if (snake.wanderAngle > 2.5) snake.wanderAngle = 2.5; // Very wide bounds
-                if (snake.wanderAngle < -2.5) snake.wanderAngle = -2.5;
+                if (snake.wanderAngle > 2.5 * wanderDampen) snake.wanderAngle = 2.5 * wanderDampen;
+                if (snake.wanderAngle < -2.5 * wanderDampen) snake.wanderAngle = -2.5 * wanderDampen;
 
                 // Sometimes randomly snap the wander angle for sudden sharp turns
-                if (Math.random() < 0.02) {
-                    snake.wanderAngle = (Math.random() - 0.5) * Math.PI * 2;
+                if (Math.random() < 0.02 * wanderDampen) {
+                    snake.wanderAngle = (Math.random() - 0.5) * Math.PI * 2 * wanderDampen;
                 }
 
                 targetAngle += snake.wanderAngle;
@@ -933,10 +957,15 @@ function animate(currentTime) {
     // Calculate camera offset so the player's head is dead center
     let camX = lastCamX, camY = lastCamY;
     if (player) {
+        isIntroPan = false;
         camX = player.head.x;
         camY = player.head.y;
         lastCamX = camX;
         lastCamY = camY;
+    } else if (isIntroPan && snakes.length > 0) {
+        // Follow the first available bot during the intro sequence
+        camX = snakes[0].head.x;
+        camY = snakes[0].head.y;
     }
     const offsetX = (width / 2) - camX;
     const offsetY = (height / 2) - camY;
