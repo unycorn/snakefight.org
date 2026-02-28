@@ -24,14 +24,22 @@ class SnakeSegment {
 }
 
 class Snake {
-    constructor() {
+    constructor(x, y, name, colorType, isPlayer = false) {
         this.segments = [];
         this.pathHistory = [];
+        this.name = name;
+        this.colorType = colorType;
+        this.isPlayer = isPlayer;
+        this.score = 10;
+        this.isDead = false;
+        this.readyToRemove = false;
+        this.deathAlpha = 1.0;
+
         for (let i = 0; i < INITIAL_SEGMENTS; i++) {
-            this.segments.push(new SnakeSegment(0, 0)); // Start at world 0,0
+            this.segments.push(new SnakeSegment(x, y));
         }
         for (let i = 0; i < INITIAL_SEGMENTS * 10; i++) {
-            this.pathHistory.push({ x: 0, y: 0 });
+            this.pathHistory.push({ x, y });
         }
         this.head = this.segments[0];
         this.angle = 0; // Current movement direction
@@ -42,23 +50,26 @@ class Snake {
     }
 
     get radius() {
-        return 20 + score * 0.005;
+        return 20 + this.score * 0.005;
     }
 
     get segmentDistance() {
         return this.radius * 0.5;
     }
 
-    update() {
-        if (!gameStarted) return;
+    update(targetAngle, isAccelerating) {
+        if (!gameStarted || this.readyToRemove) return;
 
-        // Head is always at screen center (width/2, height/2).
-        // Find angle from screen center to mouse cursor.
-        const dx = mouse.x - (width / 2);
-        const dy = mouse.y - (height / 2);
-        const targetAngle = Math.atan2(dy, dx);
+        if (this.isDead) { // Dying animation state
+            this.deathAlpha -= 0.1;
+            if (this.deathAlpha <= 0.0) {
+                this.deathAlpha = 0.0;
+                this.readyToRemove = true;
+            }
+            return; // don't move
+        }
 
-        // Smoothly rotate current angle towards target angle
+        // Smoothly rotate current angle towards targetAngle
         let diff = targetAngle - this.angle;
 
         // Normalize the difference to between -PI and PI for shortest-path turning
@@ -72,13 +83,13 @@ class Snake {
         }
 
         // Handle Dashing Mechanics
-        this.isAccelerating = isDashing && score > 0;
+        this.isAccelerating = isAccelerating && this.score > 0;
         let currentSpeed = SNAKE_SPEED;
 
         if (this.isAccelerating) {
             currentSpeed = SNAKE_SPEED * 1.8; // Speed boost
-            score -= 0.3; // Drain score over time
-            if (score < 0) score = 0;
+            this.score -= 0.3; // Drain score over time
+            if (this.score < 0) this.score = 0;
         }
 
         // Constant movement in the direction of the current angle
@@ -134,8 +145,7 @@ class Snake {
         }
 
         // Maintain deterministic length based on score
-        // score / 10 equals the number of pellets eaten. Multiply by GROWTH_PER_PELLET and floor it.
-        const pelletsEaten = score / 10;
+        const pelletsEaten = this.score / 10;
         const targetLength = INITIAL_SEGMENTS + Math.floor(pelletsEaten * GROWTH_PER_PELLET);
 
         while (this.segments.length < targetLength) {
@@ -175,10 +185,24 @@ class Snake {
             gradient.addColorStop(1, 'rgba(255, 50, 0, 0.8)');
             oCtx.shadowColor = '#ff2200';
         } else {
-            // Normal colors: icy blue
-            gradient.addColorStop(0, 'rgba(54, 32, 255, 0.95)');
-            gradient.addColorStop(1, 'rgba(0, 18, 179, 0.8)');
-            oCtx.shadowColor = '#00065cff';
+            // Normal colors
+            if (this.colorType === 'green') {
+                gradient.addColorStop(0, 'rgba(50, 255, 100, 0.95)');
+                gradient.addColorStop(1, 'rgba(0, 180, 50, 0.8)');
+                oCtx.shadowColor = '#00b432';
+            } else if (this.colorType === 'purple') {
+                gradient.addColorStop(0, 'rgba(200, 50, 255, 0.95)');
+                gradient.addColorStop(1, 'rgba(120, 0, 180, 0.8)');
+                oCtx.shadowColor = '#7800b4';
+            } else if (this.colorType === 'pink') {
+                gradient.addColorStop(0, 'rgba(255, 50, 150, 0.95)');
+                gradient.addColorStop(1, 'rgba(180, 0, 80, 0.8)');
+                oCtx.shadowColor = '#b40050';
+            } else { // default blue
+                gradient.addColorStop(0, 'rgba(54, 32, 255, 0.95)');
+                gradient.addColorStop(1, 'rgba(0, 18, 179, 0.8)');
+                oCtx.shadowColor = '#00065cff';
+            }
         }
 
         oCtx.fillStyle = gradient;
@@ -187,6 +211,10 @@ class Snake {
     }
 
     draw(offsetX, offsetY) {
+        if (this.readyToRemove) return;
+        ctx.save();
+        ctx.globalAlpha = this.deathAlpha;
+
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
@@ -218,9 +246,24 @@ class Snake {
             } else {
                 ctx.beginPath();
                 ctx.arc(screenX, screenY, currentRadius, 0, Math.PI * 2);
-                ctx.fillStyle = this.isAccelerating ? `rgba(255, 100, 0, 0.8)` : `rgba(0, 242, 255, 0.8)`;
+                let fallbackFill = 'rgba(0, 242, 255, 0.8)';
+                let fallbackShadow = '#00f2ff';
+                if (this.isAccelerating) {
+                    fallbackFill = `rgba(255, 100, 0, 0.8)`;
+                    fallbackShadow = '#ff2200';
+                } else if (this.colorType === 'green') {
+                    fallbackFill = 'rgba(0, 255, 100, 0.8)';
+                    fallbackShadow = '#00ff64';
+                } else if (this.colorType === 'purple') {
+                    fallbackFill = 'rgba(200, 50, 255, 0.8)';
+                    fallbackShadow = '#c832ff';
+                } else if (this.colorType === 'pink') {
+                    fallbackFill = 'rgba(255, 50, 150, 0.8)';
+                    fallbackShadow = '#ff3296';
+                }
+                ctx.fillStyle = fallbackFill;
                 ctx.shadowBlur = 10;
-                ctx.shadowColor = this.isAccelerating ? '#ff2200' : '#00f2ff';
+                ctx.shadowColor = fallbackShadow;
                 ctx.fill();
             }
 
@@ -258,10 +301,14 @@ class Snake {
                 ctx.shadowBlur = 0;
                 const pupilRadius = eyeRadius * 0.5;
                 const pupilOffset = eyeRadius * 0.45; // Look slightly forward
-                // Calculate angle specifically to the mouse for the pupils
-                const pDx = mouse.x - (width / 2);
-                const pDy = mouse.y - (height / 2);
-                const pupilAngle = Math.atan2(pDy, pDx);
+
+                // Track mouse if player, else track movement direction
+                let pupilAngle = this.angle;
+                if (this.isPlayer) {
+                    const pDx = mouse.x - (width / 2);
+                    const pDy = mouse.y - (height / 2);
+                    pupilAngle = Math.atan2(pDy, pDx);
+                }
 
                 const leftPupilX = leftEyeX + Math.cos(pupilAngle) * pupilOffset;
                 const leftPupilY = leftEyeY + Math.sin(pupilAngle) * pupilOffset;
@@ -280,6 +327,7 @@ class Snake {
                 ctx.restore();
             }
         }
+        ctx.restore(); // Restore globalAlpha
     }
 }
 
@@ -303,25 +351,47 @@ class Pellet {
         const hue = Math.floor(Math.random() * 360);
         this.color = `hsl(${hue}, 100%, 60%)`;
         this.isEaten = false;
+        this.targetSnake = null;
+        this.spawnAlpha = 1.0;
+        this.isPermanentlyDead = false;
     }
 
     update() {
-        if (this.isEaten) {
+        if (this.spawnAlpha < 1.0) {
+            this.spawnAlpha += 0.1;
+            if (this.spawnAlpha > 1.0) this.spawnAlpha = 1.0;
+        }
+
+        if (this.isEaten && this.targetSnake) {
             // Fly into the snake's mouth
-            const dx = snake.head.x - this.x;
-            const dy = snake.head.y - this.y;
+            const dx = this.targetSnake.head.x - this.x;
+            const dy = this.targetSnake.head.y - this.y;
             this.x += dx * 0.2;
             this.y += dy * 0.2;
             this.size -= 0.5; // Shrink
 
             if (this.size <= 0.1) {
-                this.reset();
-                // Ensure the pellet doesn't respawn too close to the snake
-                while (Math.sqrt(Math.pow(snake.head.x - this.baseX, 2) + Math.pow(snake.head.y - this.baseY, 2)) < 200) {
+                // Determine if we should respawn or stay dead to maintain cap
+                const activePellets = pellets.filter(p => !p.isEaten && !p.isPermanentlyDead).length;
+                if (activePellets >= PELLET_COUNT) {
+                    this.isPermanentlyDead = true;
+                } else {
                     this.reset();
+                    // Ensure the pellet doesn't respawn too close to any snake
+                    let tooClose = true;
+                    while (tooClose) {
+                        tooClose = false;
+                        for (const s of snakes) {
+                            if (Math.sqrt(Math.pow(s.head.x - this.baseX, 2) + Math.pow(s.head.y - this.baseY, 2)) < 200) {
+                                tooClose = true;
+                                break;
+                            }
+                        }
+                        if (tooClose) this.reset();
+                    }
                 }
             }
-        } else {
+        } else if (!this.isPermanentlyDead) {
             this.orbitAngle += this.orbitSpeed;
             this.x = this.baseX + Math.cos(this.orbitAngle) * this.orbitRadius;
             this.y = this.baseY + Math.sin(this.orbitAngle) * this.orbitRadius;
@@ -335,6 +405,9 @@ class Pellet {
 
         // Only draw if roughly within screen bounds to save performance
         if (screenX < -50 || screenX > width + 50 || screenY < -50 || screenY > height + 50) return;
+
+        ctx.save();
+        ctx.globalAlpha = this.spawnAlpha;
 
         // Subtler blink effect (multiplier 0.5 instead of 2), and don't blink if eaten
         const pSize = this.isEaten ? Math.max(0.1, this.size) : this.size + Math.sin(this.pulse) * 0.5;
@@ -353,14 +426,72 @@ class Pellet {
             ctx.fill();
             ctx.fill(); // Double drawing heavily intensifies the glow opacity
         }
+        ctx.restore();
     }
 }
 
-let snake;
+let snakes = [];
 let pellets = [];
 let playerName = "";
 let USE_GRADIENT = true;
 let isDashing = false;
+let npcNames = [
+    "Amy Stake", "Barb Dwyer", "Chris P Bacon", "Chris P Baker", "Chris Peacock",
+    "Drew Peacock", "Flo Peacock", "Doug Graves", "Ella Vader", "Emma Roids",
+    "Hugh Jass", "Hugh Janus", "Jack Hoff", "Jacqueline Hyde", "Jed I Knight",
+    "Laura Lynn Hardy", "Lee King", "Mike Hawk", "Mike Rotch", "Ophelia Pane",
+    "Paige Turner", "Paul Bearer", "Phil McCracken", "Philipa Bucket", "Rhoda Wolff",
+    "Robyn Banks", "Seymour Cox", "Sue Flay", "Sum Ting Wong", "Teresa Brown",
+    "Teresa Crowd", "Teresa Green", "Tim Burr", "Toby Lerone", "Ty Prater",
+    "Wayne Kerr", "Zoltan Pepper", "Earthworm Jones", "Roundworm Jones", "Leech Jones",
+    "Eel Jones", "Lamprey Jones", "Caecilian Jones", "Sea cucumber Jones",
+    "Peanut worm Jones", "Ribbon worm Jones", "Hagfish Jones", "Polychaete Jones",
+    "Tubeworm Jones", "Sausage worm Jones", "Giant shipworm Jones", "Amphioxus Jones",
+    "Marsha Mellow", "Chip Munk", "Neil Down", "Paige Turner", "Anita Bath",
+    "Art Major", "Story Teller", "Al O’Vera", "Cliff Hanger", "Clair Annette",
+    "Kerry Oki", "Ella Vator", "Holly Daze", "Noah Lott", "Willie Makeit",
+    "Noah Dia", "Barry Cade", "Cam Payne", "Cara Van", "Candace Spencer",
+    "Duane Pipe", "Justin Time", "Sal Monella", "Dill Eavery", "Al Dente",
+    "Gene Pool", "Frank Enstein", "Jed Dye", "Artie Choke", "Ray D. Ater",
+    "Tim Burr", "Tish Hughes", "Walter Melon", "Jack Inabocks", "Emma Grate",
+    "Rosa Bush", "Holden Aseck", "Ivy League", "Cy Nara", "Ginny Tonic",
+    "Pearl Button", "Colleen Cardd", "Mae Day", "Jack Pott", "Ty Coon",
+    "Anna Graham", "Izzy Gone", "Joe King", "Al Bino", "Ali Gaither",
+    "Stanley Cupp", "Sloane Steady", "Crystal Clearwater", "Douglas Furr", "Tad Moore",
+    "Landon Pi", "Justin Case", "Ken Dahl", "Walt R. Upto", "Biff Wellington",
+    "Brighton Early", "Major Payne", "Earl E. Bird", "Liv Long", "Teddy Baer",
+    "Candy Barr", "Annie Howe", "Marty Graw", "Mary Kristmas", "Bea Havior",
+    "Chris Coe", "Buck N. Ears", "Olive Green", "Phil Graves", "Piece Heart",
+    "Mel O’Drama", "Sue Flay", "Joy Rider", "Polly Ester", "Chris P. Bacon",
+    "Ali Katt", "Peg Legge", "Robyn Banks", "Otto Graf", "Rhoda Carr",
+    "Jasmine Rice", "Matt Tress", "Rocky Rhodes", "Sandy Banks", "Russell Sprout",
+    "Manny Moore", "Rose Bush", "Sharon Lunch", "June Bugg", "Story Tyme",
+    "Blue Knight", "Tommy Hawk", "Rusty Bridges", "Brock Lee", "Sonny Day",
+    "Wanda Rinn", "Willie Leeve", "Harry Houze", "Tom Morrow", "Bill Board",
+    "Virginia Beach", "Owen Cash", "Guy Power", "North West", "Sweetie Pi",
+    "Herb Garden", "Eaton Wright", "Lisa Ford", "Ben Dover", "Sage Berger",
+    "Patty O’Furniture", "Ophelia Payne", "Kay Bull", "Piper Down", "Tiffany Box",
+    "Warren Peace", "Lake Day", "Candy Kane", "Olive Yu", "Richie Poore",
+    "Dan Saul Knight", "Sandy Beach", "Raven Claw", "Dee Liver", "Phillip Button",
+    "Ferris Wheeler", "Mel Loewe", "Miles A. Head", "Ima Foxx", "Kandi Queene",
+    "Apple Pi", "Crystal Clear", "Forrest Green", "Cy Klone", "Bea O’Problem",
+    "Carry Oakey", "Rocky Stone", "Bud Wiser", "Ima Pigg", "Will Power",
+    "Ann Teak", "Kelly Green", "Bonnie Ann Clyde", "Cole Slaw", "Foster Child",
+    "Joe Kerr", "Penny Loafer", "Dusty Carr", "Ray Gunn", "Buck Wild",
+    "Ocean Ball", "Don Key", "Art Seller", "Annie May Shin", "Anna May",
+    "Gus T. Wind", "Guy Swett", "Harry Baer", "Tad Pohl", "Charity Case",
+    "Summer Day", "Stan Still", "Reign Mann", "Rusty Dorr", "Lisa Mann",
+    "Anna Conda", "Joy Ful", "Roman Holiday", "Daisy Gardener", "Royal Payne",
+    "Holly Wood", "Rowan Boatmann", "Ella Funt", "Rocky Hill", "Lou Natic",
+    "Olive Barr", "Myles Long", "Manny Kin", "Ginger Snap", "Anita Resume",
+    "Marshall Law", "Pat Myback", "Dan Druff", "Jack Hammer", "Crystal Glass",
+    "Constance Noring", "Polly Tics", "Sunny Day", "Shirley U. Jest", "Lucy Fer",
+    "Walker Strait", "Grace Kyes", "Misty Meanor", "Amanda Lynn", "Johnny B. Good",
+    "Rick O’Shea", "Barb Dwyer", "Criss Chross", "Saint O’ffender", "Max Power"
+];
+let playerRespawnTime = 0;
+let lastCamX = 0;
+let lastCamY = 0;
 
 // FPS tracking
 let lastFrameTime = performance.now();
@@ -370,7 +501,19 @@ const fpsElement = document.getElementById('fps-counter');
 
 function init() {
     resize();
-    snake = new Snake();
+    snakes = [];
+    snakes.push(new Snake(0, 0, playerName || "Player", "blue", true));
+
+    // Spawn some NPCs
+    for (let i = 0; i < 5; i++) {
+        const colors = ['green', 'purple', 'pink', 'blue'];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const spawnX = (Math.random() - 0.5) * WORLD_SIZE;
+        const spawnY = (Math.random() - 0.5) * WORLD_SIZE;
+        const rName = npcNames[Math.floor(Math.random() * npcNames.length)] + " (bot)";
+        snakes.push(new Snake(spawnX, spawnY, rName, color, false));
+    }
+
     // Start mouse at center so it doesn't immediately snap weirdly
     mouse.x = width / 2;
     mouse.y = height / 2;
@@ -418,6 +561,17 @@ function startGame(e) {
     const input = document.getElementById('username-input');
     playerName = input.value.trim() || 'Player';
 
+    // Update the player's name if they've already spawned in the background
+    const p = snakes.find(s => s.isPlayer);
+    if (p) {
+        p.name = playerName;
+    } else {
+        // Respawn the player if they were entirely removed due to death
+        const spawnX = (Math.random() - 0.5) * WORLD_SIZE;
+        const spawnY = (Math.random() - 0.5) * WORLD_SIZE;
+        snakes.push(new Snake(spawnX, spawnY, playerName, "blue", true));
+    }
+
     gameStarted = true;
 
     // Hide title screen
@@ -434,22 +588,112 @@ window.addEventListener('keydown', handleKeyDown);
 document.getElementById('start-form').addEventListener('submit', startGame);
 
 init();
+
+function updateLeaderboard() {
+    const list = document.getElementById('leaderboard-list');
+    if (!list) return;
+
+    // Sort all snakes by score descending
+    const sorted = snakes.filter(s => !s.isDead).sort((a, b) => b.score - a.score).slice(0, 10);
+
+    list.innerHTML = sorted.map((s, index) => {
+        const isMe = s.isPlayer ? 'style="color: var(--accent-color); font-weight: bold;"' : '';
+        return `<li ${isMe}>
+            <span>${index + 1}. ${s.name}</span>
+            <span class="score">${Math.floor(s.score)}</span>
+        </li>`;
+    }).join('');
+}
+
 function checkCollisions() {
-    // We can do this in world space, independent of rendering offset
-    const currentRadius = snake.radius;
-    const hitBoxRadius = currentRadius * 1.3; // Make eating more forgiving
-    pellets.forEach(p => {
-        if (p.isEaten) return; // Ignore pellets already being eaten
+    snakes.forEach(snake => {
+        if (snake.isDead) return;
+        const currentRadius = snake.radius;
+        const hitBoxRadius = currentRadius * 1.3; // Make eating more forgiving
+        pellets.forEach(p => {
+            if (p.isEaten) return; // Ignore pellets already being eaten
 
-        const dx = snake.head.x - p.x;
-        const dy = snake.head.y - p.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+            const dx = snake.head.x - p.x;
+            const dy = snake.head.y - p.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist < hitBoxRadius + p.size) { // Collision radius
-            p.isEaten = true;
-            score += 10;
-        }
+            if (dist < hitBoxRadius + p.size) { // Collision radius
+                p.isEaten = true;
+                p.targetSnake = snake;
+                snake.score += 10;
+            }
+        });
     });
+}
+
+function checkSnakeCollisions() {
+    for (let i = 0; i < snakes.length; i++) {
+        const snakeA = snakes[i];
+        if (snakeA.isDead) continue;
+
+        const headA = snakeA.head;
+        const radiusA = snakeA.radius;
+
+        for (let j = 0; j < snakes.length; j++) {
+            if (i === j) continue; // Don't collide with self
+            const snakeB = snakes[j];
+            if (snakeB.isDead) continue;
+
+            const radiusB = snakeB.radius;
+
+            // Check head A against all body segments of B
+            // If A's head hits B's body, A dies.
+            for (let k = 1; k < snakeB.segments.length; k += 3) { // optimization: check every 3rd segment
+                const segB = snakeB.segments[k];
+                const dx = headA.x - segB.x;
+                const dy = headA.y - segB.y;
+                const distSq = dx * dx + dy * dy;
+                const minRadiusSquared = Math.pow(radiusA + radiusB, 2);
+
+                if (distSq < minRadiusSquared) {
+                    snakeA.isDead = true;
+                    // Spawn pellets from dead snake
+                    spawnPelletsFromSnake(snakeA);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+function spawnPelletsFromSnake(deadSnake) {
+    // Drop 1 pellet for every 20 score, spread along path
+    const dropCount = Math.floor(deadSnake.score / 20);
+    if (dropCount <= 0) return;
+
+    const step = Math.max(1, Math.floor(deadSnake.segments.length / dropCount));
+
+    let baseHue = 230; // default blue
+    if (deadSnake.colorType === 'green') baseHue = 140;
+    else if (deadSnake.colorType === 'purple') baseHue = 280;
+    else if (deadSnake.colorType === 'pink') baseHue = 330;
+
+    for (let i = 0; i < deadSnake.segments.length && i < dropCount * step; i += step) {
+        const seg = deadSnake.segments[i];
+        let p = pellets.find(pellet => pellet.isEaten && pellet.size <= 0.1);
+        if (!p) {
+            p = new Pellet();
+            pellets.push(p);
+        }
+        p.reset();
+        p.baseX = seg.x + (Math.random() - 0.5) * 50;
+        p.baseY = seg.y + (Math.random() - 0.5) * 50;
+        p.x = p.baseX;
+        p.y = p.baseY;
+        p.size = 8 + Math.random() * 8; // Double normal size
+
+        // Add subtle hue/lightness variation around the base color
+        const pelletHue = baseHue + (Math.random() - 0.5) * 30; // +/- 15 degrees
+        const pelletLightness = 50 + Math.random() * 20; // 50-70% lightness
+        p.color = `hsl(${pelletHue}, 100%, ${pelletLightness}%)`;
+
+        p.spawnAlpha = 0.0; // fade in from 0
+    }
 }
 
 function drawGrid(camX, camY) {
@@ -574,23 +818,117 @@ function animate(currentTime) {
         if (fpsElement) fpsElement.textContent = `${framesThisSecond} FPS`;
         framesThisSecond = 0;
         lastFpsUpdateTime = currentTime;
+        updateLeaderboard();
     }
 
     // Update DOM score deterministically
-    scoreElement.textContent = Math.floor(score);
+    const player = snakes.find(s => s.isPlayer);
+    if (player) {
+        scoreElement.textContent = Math.floor(player.score);
+    }
 
     ctx.clearRect(0, 0, width, height);
 
-    // Update snake logic (world coordinates)
-    snake.update();
+    // AI Logic and Update all snakes
+    snakes.forEach(snake => {
+        if (snake.readyToRemove) return; // Skip update if snake is ready to be removed
 
-    // Calculate camera offset so the head is dead center
-    const offsetX = (width / 2) - snake.head.x;
-    const offsetY = (height / 2) - snake.head.y;
+        let targetAngle = snake.angle;
+        let accel = false;
+
+        if (!snake.isDead) { // Only update logic if alive
+            if (snake.isPlayer) {
+                const dx = mouse.x - (width / 2);
+                const dy = mouse.y - (height / 2);
+                targetAngle = Math.atan2(dy, dx);
+                accel = isDashing;
+            } else {
+                // AI Logic: Combine Pellet Seeking, Obstacle Avoidance, and Wander
+                let desiredX = 0;
+                let desiredY = 0;
+
+                // 1. Find closest uneaten pellet
+                let closestDist = Infinity;
+                let closestPellet = null;
+                for (const p of pellets) {
+                    if (p.isEaten) continue;
+                    const distSq = Math.pow(p.x - snake.head.x, 2) + Math.pow(p.y - snake.head.y, 2);
+                    if (distSq < closestDist) {
+                        closestDist = distSq;
+                        closestPellet = p;
+                    }
+                }
+
+                if (closestPellet) {
+                    desiredX = closestPellet.x - snake.head.x;
+                    desiredY = closestPellet.y - snake.head.y;
+                    const pLen = Math.sqrt(desiredX * desiredX + desiredY * desiredY);
+                    if (pLen > 0) {
+                        desiredX /= pLen;
+                        desiredY /= pLen;
+                    }
+                }
+
+                // 2. Avoid other snakes (Repulsion)
+                let repX = 0;
+                let repY = 0;
+                const avoidRadius = 150; // Was 300 - much less aware of surroundings
+
+                for (const other of snakes) {
+                    if (other === snake || other.readyToRemove) continue;
+
+                    const checkPoints = [other.head, ...other.segments];
+                    for (let i = 0; i < checkPoints.length; i += 5) { // Check every 5th segment for performance
+                        const pt = checkPoints[i];
+                        const dx = snake.head.x - pt.x;
+                        const dy = snake.head.y - pt.y;
+                        const distSq = dx * dx + dy * dy;
+
+                        if (distSq > 0 && distSq < avoidRadius * avoidRadius) {
+                            const dist = Math.sqrt(distSq);
+                            const force = Math.pow((avoidRadius - dist) / avoidRadius, 2); // Exponential falloff
+                            repX += (dx / dist) * force;
+                            repY += (dy / dist) * force;
+                        }
+                    }
+                }
+
+                // Mix vectors. Repulsion overrides pellet seeking if strong.
+                desiredX += repX * 1.5; // Was 3.0 - much weaker repulsion
+                desiredY += repY * 1.5;
+
+                if (desiredX !== 0 || desiredY !== 0) {
+                    targetAngle = Math.atan2(desiredY, desiredX);
+                }
+
+                // 3. Add smooth wander
+                if (snake.wanderAngle === undefined) snake.wanderAngle = 0;
+                snake.wanderAngle += (Math.random() - 0.5) * 0.25; // More erratic
+                // Bound wander angle 
+                if (snake.wanderAngle > 1.2) snake.wanderAngle = 1.2; // Wider bounds
+                if (snake.wanderAngle < -1.2) snake.wanderAngle = -1.2;
+
+                targetAngle += snake.wanderAngle;
+            }
+        }
+
+        snake.update(targetAngle, accel);
+    });
+
+    // Calculate camera offset so the player's head is dead center
+    let camX = lastCamX, camY = lastCamY;
+    if (player) {
+        camX = player.head.x;
+        camY = player.head.y;
+        lastCamX = camX;
+        lastCamY = camY;
+    }
+    const offsetX = (width / 2) - camX;
+    const offsetY = (height / 2) - camY;
 
     // Draw background grid 
     ctx.shadowBlur = 0;
-    drawGrid(snake.head.x, snake.head.y);
+    drawGrid(camX, camY);
 
     // Update & Draw Pellets
     pellets.forEach(p => {
@@ -598,11 +936,42 @@ function animate(currentTime) {
         p.draw(offsetX, offsetY);
     });
 
-    // Draw Snake
-    snake.draw(offsetX, offsetY);
+    // Draw Snakes
+    // Draw NPCs first, then player on top
+    snakes.forEach(snake => {
+        if (!snake.readyToRemove && !snake.isPlayer) snake.draw(offsetX, offsetY);
+    });
+    if (player && !player.readyToRemove) player.draw(offsetX, offsetY);
 
     // Check world-space collisions
     checkCollisions();
+    checkSnakeCollisions();
+
+    // Remove dead snakes and respawn
+    for (let i = snakes.length - 1; i >= 0; i--) {
+        if (snakes[i].readyToRemove) {
+            const deadState = snakes[i];
+            snakes.splice(i, 1);
+            if (deadState.isPlayer) {
+                // Delay player respawn by 500 ms
+                playerRespawnTime = currentTime + 500;
+            } else {
+                // Respawn NPC
+                const colors = ['green', 'purple', 'pink', 'blue'];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                const spawnX = (Math.random() - 0.5) * WORLD_SIZE;
+                const spawnY = (Math.random() - 0.5) * WORLD_SIZE;
+                const rName = npcNames[Math.floor(Math.random() * npcNames.length)] + " (bot)";
+                snakes.push(new Snake(spawnX, spawnY, rName, color, false));
+            }
+        }
+    }
+
+    if (playerRespawnTime > 0 && currentTime > playerRespawnTime) {
+        playerRespawnTime = 0;
+        gameStarted = false;
+        document.getElementById('message-container').classList.remove('hidden');
+    }
 
     requestAnimationFrame(animate);
 }

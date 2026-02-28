@@ -77,6 +77,38 @@ body {
     opacity: 0.8;
 }
 
+#leaderboard {
+    position: absolute;
+    top: 5rem;
+    right: 2rem;
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+    min-width: 260px;
+}
+
+#leaderboard-list {
+    list-style: none;
+    font-size: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+#leaderboard-list li {
+    display: flex;
+    justify-content: space-between;
+    opacity: 0.9;
+}
+
+#leaderboard-list li span.score {
+    color: var(--accent-color);
+    font-weight: 700;
+}
+
 #score-value {
     font-size: 1.5rem;
     font-weight: 700;
