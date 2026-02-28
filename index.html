@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glow Snake | Premium 2D Experience</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div id="ui-container">
+        <div id="score-card">
+            <span class="label">SCORE</span>
+            <span id="score-value">0</span>
+        </div>
+        <div id="fps-counter" class="label">60 FPS</div>
+        <div id="message-container">
+            <h1 id="main-title">GLOW SNAKE</h1>
+            <form id="start-form">
+                <input type="text" id="username-input" placeholder="Enter Username (Optional)" autocomplete="off"
+                    maxlength="15">
+                <p id="prompt">Press Enter to Start</p>
+                <button type="submit" style="display: none;"></button>
+            </form>
+        </div>
+    </div>
+    <canvas id="game-canvas"></canvas>
+    <script src="game.js"></script>
+</body>
+
+</html>

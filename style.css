@@ -1,0 +1,167 @@
+:root {
+    --bg-color: #0b0c0f;
+    --accent-color: #00f2ff;
+    --text-color: #ffffff;
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glow-shadow: 0 0 20px rgba(0, 242, 255, 0.5);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: 'Outfit', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+}
+
+#game-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+#ui-container {
+    position: relative;
+    z-index: 10;
+    pointer-events: none;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 2rem;
+}
+
+#score-card {
+    align-self: flex-start;
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+}
+
+.label {
+    font-size: 0.7rem;
+    letter-spacing: 0.2rem;
+    opacity: 0.6;
+    font-weight: 300;
+}
+
+#fps-counter {
+    position: absolute;
+    top: 2rem;
+    right: 2rem;
+    background: var(--glass-bg);
+    backdrop-filter: blur(5px);
+    border: 1px solid var(--glass-border);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    opacity: 0.8;
+}
+
+#score-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    text-shadow: var(--glow-shadow);
+}
+
+#message-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: auto;
+    /* Re-enable pointer events for the form inside */
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+}
+
+#message-container.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+#main-title {
+    font-size: 4rem;
+    letter-spacing: 0.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #fff 0%, var(--accent-color) 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 2rem;
+    opacity: 0.9;
+}
+
+#start-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+#username-input {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: var(--text-color);
+    font-family: inherit;
+    font-size: 1.2rem;
+    padding: 1rem 1.5rem;
+    border-radius: 30px;
+    width: 300px;
+    text-align: center;
+    outline: none;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(5px);
+}
+
+#username-input:focus {
+    border-color: var(--accent-color);
+    box-shadow: var(--glow-shadow);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#username-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+#prompt {
+    font-size: 1rem;
+    letter-spacing: 0.1rem;
+    opacity: 0.5;
+    animation: pulse 2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 0.3;
+        transform: scale(0.98);
+    }
+
+    50% {
+        opacity: 0.7;
+        transform: scale(1.02);
+    }
+}
