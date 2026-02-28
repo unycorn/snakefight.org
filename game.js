@@ -13,8 +13,8 @@ const SNAKE_SPEED = 4.5;
 const TURN_SPEED = 0.1;
 const INITIAL_SEGMENTS = 10;
 const GROWTH_PER_PELLET = 0.4; // Number of segments added per pellet (fractional)
-const PELLET_COUNT = 900;
-const WORLD_SIZE = 4000;
+const PELLET_COUNT = 2500;
+const WORLD_SIZE = 10000;
 
 class SnakeSegment {
     constructor(x, y) {
@@ -181,9 +181,11 @@ class Snake {
 
         if (this.isAccelerating) {
             // Dash colors: fiery orange/red
-            gradient.addColorStop(0, 'rgba(255, 170, 50, 0.95)');
-            gradient.addColorStop(1, 'rgba(255, 50, 0, 0.8)');
-            oCtx.shadowColor = '#ff2200';
+            // gradient.addColorStop(0, 'rgba(255, 170, 50, 0.95)');
+            // gradient.addColorStop(1, 'rgba(255, 50, 0, 0.8)');
+            gradient.addColorStop(0, 'rgba(54, 32, 255, 0.95)');
+            gradient.addColorStop(1, 'rgba(0, 18, 179, 0.8)');
+            oCtx.shadowColor = '#ffffffff';
         } else {
             // Normal colors
             if (this.colorType === 'green') {
@@ -634,6 +636,14 @@ function checkSnakeCollisions() {
         const headA = snakeA.head;
         const radiusA = snakeA.radius;
 
+        // Check World Border Collisions
+        const halfWorld = WORLD_SIZE / 2;
+        if (headA.x < -halfWorld || headA.x > halfWorld || headA.y < -halfWorld || headA.y > halfWorld) {
+            snakeA.isDead = true;
+            // No pellets spawned when dying to the border!
+            continue;
+        }
+
         for (let j = 0; j < snakes.length; j++) {
             if (i === j) continue; // Don't collide with self
             const snakeB = snakes[j];
@@ -903,10 +913,15 @@ function animate(currentTime) {
 
                 // 3. Add smooth wander
                 if (snake.wanderAngle === undefined) snake.wanderAngle = 0;
-                snake.wanderAngle += (Math.random() - 0.5) * 0.25; // More erratic
+                snake.wanderAngle += (Math.random() - 0.5) * 0.8; // Huge increase in wander volatility
                 // Bound wander angle 
-                if (snake.wanderAngle > 1.2) snake.wanderAngle = 1.2; // Wider bounds
-                if (snake.wanderAngle < -1.2) snake.wanderAngle = -1.2;
+                if (snake.wanderAngle > 2.5) snake.wanderAngle = 2.5; // Very wide bounds
+                if (snake.wanderAngle < -2.5) snake.wanderAngle = -2.5;
+
+                // Sometimes randomly snap the wander angle for sudden sharp turns
+                if (Math.random() < 0.02) {
+                    snake.wanderAngle = (Math.random() - 0.5) * Math.PI * 2;
+                }
 
                 targetAngle += snake.wanderAngle;
             }
@@ -929,6 +944,26 @@ function animate(currentTime) {
     // Draw background grid 
     ctx.shadowBlur = 0;
     drawGrid(camX, camY);
+
+    // Draw Map Border (Optimized)
+    ctx.save();
+    const bx = -WORLD_SIZE / 2 + offsetX;
+    const by = -WORLD_SIZE / 2 + offsetY;
+
+    // Simulate glow with layered translucent strokes instead of expensive shadowBlur
+    for (let i = 0; i < 6; i++) {
+        const glowWidth = 40 - (i * 6);
+        const glowAlpha = 0.1 + (i * 0.15); // Ramp up opacity towards the core
+        ctx.strokeStyle = `rgba(200, 0, 0, ${glowAlpha})`;
+        ctx.lineWidth = glowWidth;
+        ctx.strokeRect(bx, by, WORLD_SIZE, WORLD_SIZE);
+    }
+
+    // Core line
+    ctx.strokeStyle = 'red';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(bx, by, WORLD_SIZE, WORLD_SIZE);
+    ctx.restore();
 
     // Update & Draw Pellets
     pellets.forEach(p => {
