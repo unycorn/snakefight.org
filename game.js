@@ -87,7 +87,7 @@ class Snake {
         let currentSpeed = SNAKE_SPEED;
 
         if (this.isAccelerating) {
-            currentSpeed = SNAKE_SPEED * 1.8; // Speed boost
+            currentSpeed = SNAKE_SPEED * 2.5; // Speed boost
             this.score -= 0.3; // Drain score over time
             if (this.score < 0) this.score = 0;
         }
@@ -158,9 +158,10 @@ class Snake {
     }
 
     updateSegmentCache() {
-        if (this.cachedRadius === this.radius && this.cachedDashing === this.isAccelerating) return;
+        if (this.cachedRadius === this.radius && this.cachedDashing === this.isAccelerating && this.cachedGlow === USE_GLOW) return;
         this.cachedRadius = this.radius;
         this.cachedDashing = this.isAccelerating;
+        this.cachedGlow = USE_GLOW;
 
         const padding = 15; // Space for shadow blur
         const totalSize = (this.radius + padding) * 2;
@@ -208,7 +209,7 @@ class Snake {
         }
 
         oCtx.fillStyle = gradient;
-        oCtx.shadowBlur = 10;
+        oCtx.shadowBlur = USE_GLOW ? 10 : 0;
         oCtx.fill();
     }
 
@@ -268,8 +269,12 @@ class Snake {
                     fallbackShadow = '#ff3296';
                 }
                 ctx.fillStyle = fallbackFill;
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = fallbackShadow;
+                if (USE_GLOW) {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = fallbackShadow;
+                } else {
+                    ctx.shadowBlur = 0;
+                }
                 // Sine wave color ramp effect along the body segments
                 ctx.save();
                 ctx.globalAlpha = this.deathAlpha;
@@ -296,8 +301,12 @@ class Snake {
 
                 // Whites of the eyes
                 ctx.fillStyle = 'white';
-                ctx.shadowBlur = 2;
-                ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                if (USE_GLOW) {
+                    ctx.shadowBlur = 2;
+                    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                } else {
+                    ctx.shadowBlur = 0;
+                }
 
                 ctx.beginPath();
                 ctx.arc(leftEyeX, leftEyeY, eyeRadius, 0, Math.PI * 2);
@@ -436,13 +445,17 @@ class Pellet {
         ctx.fillStyle = currentColor;
 
         if (this.isEaten) {
-            ctx.shadowBlur = 5;
-            ctx.shadowColor = currentColor;
+            if (USE_GLOW) {
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = currentColor;
+            } else ctx.shadowBlur = 0;
             ctx.fill();
         } else {
-            ctx.shadowBlur = 25; // Enhance glow
-            ctx.shadowColor = currentColor;
-            ctx.fill();
+            if (USE_GLOW) {
+                ctx.shadowBlur = 25; // Enhance glow
+                ctx.shadowColor = currentColor;
+                ctx.fill();
+            } else ctx.shadowBlur = 0;
             ctx.fill(); // Double drawing heavily intensifies the glow opacity
         }
         ctx.restore();
@@ -453,6 +466,7 @@ let snakes = [];
 let pellets = [];
 let playerName = "";
 let USE_GRADIENT = true;
+let USE_GLOW = true;
 let isDashing = false;
 let npcNames = [
     "Amy Stake", "Barb Dwyer", "Chris P Bacon", "Chris P Baker", "Chris Peacock",
@@ -569,9 +583,12 @@ function handleMouseUp(e) {
 }
 
 function handleKeyDown(e) {
-    if (e.key.toLowerCase() === 'g') {
-        USE_GRADIENT = !USE_GRADIENT;
-    }
+    // if (e.key.toLowerCase() === 'g') {
+    //     USE_GRADIENT = !USE_GRADIENT;
+    // }
+    // if (e.key.toLowerCase() === 'h') {
+    //     USE_GLOW = !USE_GLOW;
+    // }
 }
 
 function startGame(e) {
@@ -980,12 +997,14 @@ function animate(currentTime) {
     const by = -WORLD_SIZE / 2 + offsetY;
 
     // Simulate glow with layered translucent strokes instead of expensive shadowBlur
-    for (let i = 0; i < 6; i++) {
-        const glowWidth = 40 - (i * 6);
-        const glowAlpha = 0.1 + (i * 0.15); // Ramp up opacity towards the core
-        ctx.strokeStyle = `rgba(200, 0, 0, ${glowAlpha})`;
-        ctx.lineWidth = glowWidth;
-        ctx.strokeRect(bx, by, WORLD_SIZE, WORLD_SIZE);
+    if (USE_GLOW) {
+        for (let i = 0; i < 6; i++) {
+            const glowWidth = 40 - (i * 6);
+            const glowAlpha = 0.1 + (i * 0.15); // Ramp up opacity towards the core
+            ctx.strokeStyle = `rgba(200, 0, 0, ${glowAlpha})`;
+            ctx.lineWidth = glowWidth;
+            ctx.strokeRect(bx, by, WORLD_SIZE, WORLD_SIZE);
+        }
     }
 
     // Core line
