@@ -726,10 +726,8 @@ function spawnPelletsFromSnake(deadSnake) {
         p.y = p.baseY;
         p.size = 8 + Math.random() * 8; // Double normal size
 
-        // Add subtle hue/lightness variation around the base color
-        const pelletHue = baseHue + (Math.random() - 0.5) * 30; // +/- 15 degrees
-        const pelletLightness = 50 + Math.random() * 20; // 50-70% lightness
-        p.color = `hsl(${pelletHue}, 100%, ${pelletLightness}%)`;
+        // Add subtle hue variation around the base color
+        p.hue = baseHue + (Math.random() - 0.5) * 30; // +/- 15 degrees
 
         p.spawnAlpha = 0.0; // fade in from 0
     }
